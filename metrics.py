@@ -131,11 +131,14 @@ class MetricsVisualizer:
                 (self.query_data['dataset'] == config_row['dataset'])
             ]
 
+            if config_query_data.empty:
+                continue
+
             # Prepare plot data
             plot_data = config_query_data[['cluster_idx', 'n_candidates']]
             clusters_per_query = config_query_data.groupby('query_idx')['cluster_idx'].nunique()
             
-            # Violin Plot
+            # 1. Violin Plot
             plt.figure(figsize=(12, 6))
             max_candidates = plot_data['n_candidates'].max()
             
@@ -168,7 +171,7 @@ class MetricsVisualizer:
                         bbox_inches='tight', dpi=300)
             plt.close()
 
-            # Visited Clusters Distribution
+            # 2. Visited Clusters Distribution
             plt.figure(figsize=(12, 6))
 
             num_clusters = math.floor(config_row['num_clusters'] * math.sqrt(config_row['dataset_len']))
@@ -210,6 +213,46 @@ class MetricsVisualizer:
             plt.savefig(output_dir / f"{self.input_filename}_{config_row['dataset']}_n{config_row['num_clusters']:.2f}_visited_clusters.png", 
                         bbox_inches='tight', dpi=300)
             plt.close()
+
+            # 3. Aggregate statistics plot
+            plt.figure(figsize=(15, 6))
+            
+            # Calculate percentiles for each cluster
+            percentiles = config_query_data.groupby('cluster_idx')['n_candidates'].agg([
+                lambda x: np.percentile(x, 25),
+                lambda x: np.percentile(x, 50),
+                lambda x: np.percentile(x, 75)
+            ]).reset_index()
+            percentiles.columns = ['cluster_idx', 'p25', 'p50', 'p75']
+            
+            plt.fill_between(range(len(percentiles)), 
+                           percentiles['p25'],
+                           percentiles['p75'],
+                           alpha=0.3,
+                           label='25-75th percentile')
+            plt.plot(percentiles['p50'], 
+                    label='Median',
+                    color='red')
+            
+            plt.title(f"Cluster Candidates Distribution (Sorted by Median)\n"
+                     f"Dataset: {config_row['dataset']}, "
+                     f"K={config_row['k']}, δ={config_row['delta']:.2f}")
+            plt.xlabel("Cluster Index (Sorted)")
+            plt.ylabel("Number of Candidates")
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            
+            self.add_stats_text(plt, config_row, config_query_data,
+                              config_row['recall_mean'], config_row['recall_std'])
+            
+            plt.savefig(
+                output_dir / f"{self.input_filename}_{config_row['dataset']}_n{config_row['num_clusters']:.2f}_percentiles.png",
+                bbox_inches='tight',
+                dpi=300
+            )
+            plt.close()
+
+            
 
     def plot_all(self, output_folder):
         """Generate all visualizations."""

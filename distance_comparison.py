@@ -9,7 +9,6 @@ from utils.utils import is_valid_file
 def fetch_distance_computations(db_path, git_commit_hash=None):
     conn = sqlite3.connect(db_path)
     
-    # Query to fetch distance computations from both methods
     clann_query = """
     SELECT 
         'clustered' as method, 
@@ -17,6 +16,7 @@ def fetch_distance_computations(db_path, git_commit_hash=None):
         cr.k, 
         cr.delta, 
         cr.num_clusters as num_cluster_factor,
+        cr.kb_per_point,
         crq.distance_computations as value
     FROM clann_results cr
     JOIN clann_results_query crq ON (
@@ -36,6 +36,7 @@ def fetch_distance_computations(db_path, git_commit_hash=None):
         pr.k, 
         pr.delta, 
         NULL as num_cluster_factor,
+        pr.kb_per_point,
         prq.distance_computations as value
     FROM puffinn_results pr
     JOIN puffinn_results_query prq ON (
@@ -46,7 +47,6 @@ def fetch_distance_computations(db_path, git_commit_hash=None):
     )
     """
     
-    # Add git commit hash filter for CLANN if provided
     if git_commit_hash:
         clann_query += f" AND cr.git_commit_hash = '{git_commit_hash}'"
     
@@ -57,67 +57,45 @@ def fetch_distance_computations(db_path, git_commit_hash=None):
 def plot_distance_computations(data, output_folder):
     sns.set_theme(style="whitegrid")
     
-    # First, get all unique configurations for CLANN
-    clann_configs = data[data['method'] == 'clustered'].drop_duplicates(subset=['dataset', 'k', 'delta', 'num_cluster_factor'])
+    grouping_cols = ['dataset', 'k', 'delta']
     
-    for _, clann_config in clann_configs.iterrows():
-        # Find matching data for CLANN and PUFFINN
-        matching_data = data[
-            (data['dataset'] == clann_config['dataset']) & 
-            (data['k'] == clann_config['k']) & 
-            (data['delta'] == clann_config['delta']) &
-            ((data['num_cluster_factor'] == clann_config['num_cluster_factor']) | (data['num_cluster_factor'].isna()))
+    unique_configs = data.groupby(grouping_cols).apply(lambda x: x['method'].nunique() > 1).reset_index()
+    unique_configs = unique_configs[unique_configs[0]]['dataset k delta'.split()]
+    
+    for _, config in unique_configs.iterrows():
+        config_data = data[
+            (data['dataset'] == config['dataset']) & 
+            (data['k'] == config['k']) & 
+            (data['delta'] == config['delta'])
         ]
         
-        # Ensure we have both CLANN and PUFFINN data
-        if len(matching_data['method'].unique()) == 2:
-            # Now we separate data by method
-            clustered_data = matching_data[matching_data['method'] == 'clustered']
-            puffinn_data = matching_data[matching_data['method'] == 'puffinn']
-            
-            # Create plots only if both methods are present
-            if len(clustered_data) > 0 and len(puffinn_data) > 0:
-                fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
-
-                # Plot CLANN data
-                sns.boxplot(
-                    y='value', 
-                    data=clustered_data, 
-                    ax=axes[0], 
-                    color='lightblue'
-                )
-                axes[0].set_title(
-                    f"Clustered (Cluster Factor: {clann_config['num_cluster_factor']:.2})",
-                    fontsize=14
-                )
-
-                # Plot PUFFINN data
-                sns.boxplot(
-                    y='value', 
-                    data=puffinn_data, 
-                    ax=axes[1], 
-                    color='lightgreen'
-                )
-                axes[1].set_title("PUFFINN", fontsize=14)
-
-                axes[0].set_yscale('log')
-                axes[1].set_yscale('log')
-                axes[0].set_ylabel('Distance Computations (log scale)', fontsize=12)
-                
-                plot_title = f"Distance Computations Comparison\nDataset: {clann_config['dataset']}, k: {clann_config['k']}, delta: {clann_config['delta']:.2}"
-                plt.suptitle(plot_title, fontsize=16)
-                plt.tight_layout()
-                plt.subplots_adjust(top=0.85)
-                
-                # Create filename-safe version of plot title
-                safe_filename = f"distance_computations_{clann_config['dataset']}_k{clann_config['k']}_delta{clann_config['delta']:.2}_cluster{clann_config['num_cluster_factor']:.2}.png"
-                safe_filename = "".join(x for x in safe_filename if x.isalnum() or x in "._-").lower()
-                
-                output_file = f"{output_folder}/{safe_filename}"
-                plt.savefig(output_file, bbox_inches='tight', dpi=300)
-                plt.close()
-        else:
-            print("FUCK")
+        # Round num_cluster_factor to 2 decimals for legend
+        if 'num_cluster_factor' in config_data.columns:
+            config_data['cluster_factor_rounded'] = config_data['num_cluster_factor'].apply(lambda x: f'{x:.2f}' if pd.notnull(x) else 'PUFFINN')
+        
+        plt.figure(figsize=(16, 8))
+        
+        ax = sns.boxplot(
+            x='cluster_factor_rounded', 
+            y='value', 
+            hue='method',
+            data=config_data,
+            palette='Set3'
+        )
+        
+        plt.yscale('log')
+        plt.title(f"Distance Computations: {config['dataset']}, k={config['k']}, delta={config['delta']:.2}", fontsize=16)
+        plt.ylabel('Distance Computations (log scale)', fontsize=12)
+        plt.xlabel('Cluster Factor', fontsize=12)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        
+        safe_filename = f"distance_computations_{config['dataset']}_k{config['k']}_delta{config['delta']:.2}.png"
+        safe_filename = "".join(x for x in safe_filename if x.isalnum() or x in "._-").lower()
+        
+        output_file = f"{output_folder}/{safe_filename}"
+        plt.savefig(output_file, bbox_inches='tight', dpi=300)
+        plt.close()
 
 def main():
     parser = argparse.ArgumentParser(description="Visualize distance computations from SQLite database")
