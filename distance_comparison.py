@@ -57,21 +57,25 @@ def fetch_distance_computations(db_path, git_commit_hash=None):
 def plot_distance_computations(data, output_folder):
     sns.set_theme(style="whitegrid")
     
-    grouping_cols = ['dataset', 'k', 'delta']
+    grouping_cols = ['dataset', 'k', 'delta', 'kb_per_point']
     
-    unique_configs = data.groupby(grouping_cols).apply(lambda x: x['method'].nunique() > 1).reset_index()
-    unique_configs = unique_configs[unique_configs[0]]['dataset k delta'.split()]
+    method_counts = data.groupby(grouping_cols)['method'].nunique()
+    unique_configs = method_counts[method_counts > 1].reset_index()
     
     for _, config in unique_configs.iterrows():
-        config_data = data[
+        # Create boolean mask for filtering
+        mask = (
             (data['dataset'] == config['dataset']) & 
             (data['k'] == config['k']) & 
-            (data['delta'] == config['delta'])
-        ]
+            (data['delta'] == config['delta']) &
+            (data['kb_per_point'] == config['kb_per_point'])
+        )
         
-        # Round num_cluster_factor to 2 decimals for legend
-        if 'num_cluster_factor' in config_data.columns:
-            config_data['cluster_factor_rounded'] = config_data['num_cluster_factor'].apply(lambda x: f'{x:.2f}' if pd.notnull(x) else 'PUFFINN')
+        # Create a copy of the filtered data to avoid SettingWithCopyWarning
+        config_data = data[mask].copy()
+        config_data.loc[:, 'cluster_factor_rounded'] = config_data['num_cluster_factor'].apply(
+            lambda x: f'{x:.2f}' if pd.notnull(x) else 'PUFFINN'
+        )
         
         plt.figure(figsize=(16, 8))
         
@@ -83,14 +87,21 @@ def plot_distance_computations(data, output_folder):
             palette='Set3'
         )
         
-        plt.yscale('log')
-        plt.title(f"Distance Computations: {config['dataset']}, k={config['k']}, delta={config['delta']:.2}", fontsize=16)
+        #plt.yscale('log')
+        plt.title(
+            f"Distance Computations: {config['dataset']}, k={config['k']}, "
+            f"delta={config['delta']:.2}, kb_per_point={config['kb_per_point']}", 
+            fontsize=16
+        )
         plt.ylabel('Distance Computations (log scale)', fontsize=12)
         plt.xlabel('Cluster Factor', fontsize=12)
         plt.xticks(rotation=45)
         plt.tight_layout()
         
-        safe_filename = f"distance_computations_{config['dataset']}_k{config['k']}_delta{config['delta']:.2}.png"
+        safe_filename = (
+            f"distance_computations_{config['dataset']}_k{config['k']}_"
+            f"delta{config['delta']:.2}_kb{config['kb_per_point']}.png"
+        )
         safe_filename = "".join(x for x in safe_filename if x.isalnum() or x in "._-").lower()
         
         output_file = f"{output_folder}/{safe_filename}"
