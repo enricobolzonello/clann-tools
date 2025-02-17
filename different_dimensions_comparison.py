@@ -6,6 +6,19 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+import re
+
+def extract_numeric_part(dataset_name):
+    """
+    Extracts the first integer found in the dataset name.
+    For example, 'glove-10-angular' -> 10.
+    If no integer is found, returns a large number as a fallback
+    (or you could return 0, depending on your needs).
+    """
+    match = re.search(r'(\d+)', dataset_name)
+    if match:
+        return int(match.group(1))
+    return 999999999  # fallback if no digits
 
 def is_valid_file(parser, arg):
     if not os.path.exists(arg):
@@ -76,8 +89,7 @@ def plot_distance_computations(data, output_folder, prefix):
     """
     sns.set_theme(style="whitegrid")
     
-    # Order the dataset names ascending
-    datasets_sorted = sorted(data['dataset'].unique())
+    datasets_sorted = sorted(data['dataset'].unique(), key=extract_numeric_part)
     
     plt.figure(figsize=(16, 8))
     ax = sns.boxplot(
