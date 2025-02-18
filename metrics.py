@@ -42,7 +42,7 @@ class MetricsVisualizer:
                        query_idx, cluster_idx, n_candidates, 
                        (SELECT COUNT(*) FROM clann_results_query_cluster qc2 
                         WHERE qc2.num_clusters = qc.num_clusters 
-                        AND qc2.kb_per_point = qc.kb_per_point 
+                        AND qc2.num_tables = qc.num_tables 
                         AND qc2.k = qc.k 
                         AND qc2.delta = qc.delta 
                         AND qc2.dataset = qc.dataset 

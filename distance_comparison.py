@@ -16,12 +16,12 @@ def fetch_distance_computations(db_path, git_commit_hash=None):
         cr.k, 
         cr.delta, 
         cr.num_clusters as num_cluster_factor,
-        cr.kb_per_point,
+        cr.num_tables,
         crq.distance_computations as value
     FROM clann_results cr
     JOIN clann_results_query crq ON (
         cr.num_clusters = crq.num_clusters AND 
-        cr.kb_per_point = crq.kb_per_point AND 
+        cr.num_tables = crq.num_tables AND 
         cr.k = crq.k AND 
         cr.delta = crq.delta AND 
         cr.dataset = crq.dataset AND 
@@ -36,11 +36,11 @@ def fetch_distance_computations(db_path, git_commit_hash=None):
         pr.k, 
         pr.delta, 
         NULL as num_cluster_factor,
-        pr.kb_per_point,
+        pr.num_tables,
         prq.distance_computations as value
     FROM puffinn_results pr
     JOIN puffinn_results_query prq ON (
-        pr.kb_per_point = prq.kb_per_point AND 
+        pr.num_tables = prq.num_tables AND 
         pr.k = prq.k AND 
         pr.delta = prq.delta AND 
         pr.dataset = prq.dataset
@@ -57,7 +57,7 @@ def fetch_distance_computations(db_path, git_commit_hash=None):
 def plot_distance_computations(data, output_folder):
     sns.set_theme(style="whitegrid")
     
-    grouping_cols = ['dataset', 'k', 'delta', 'kb_per_point']
+    grouping_cols = ['dataset', 'k', 'delta', 'num_tables']
     
     method_counts = data.groupby(grouping_cols)['method'].nunique()
     unique_configs = method_counts[method_counts > 1].reset_index()
@@ -68,7 +68,7 @@ def plot_distance_computations(data, output_folder):
             (data['dataset'] == config['dataset']) & 
             (data['k'] == config['k']) & 
             (data['delta'] == config['delta']) &
-            (data['kb_per_point'] == config['kb_per_point'])
+            (data['num_tables'] == config['num_tables'])
         )
         
         # Create a copy of the filtered data to avoid SettingWithCopyWarning
@@ -90,7 +90,7 @@ def plot_distance_computations(data, output_folder):
         #plt.yscale('log')
         plt.title(
             f"Distance Computations: {config['dataset']}, k={config['k']}, "
-            f"delta={config['delta']:.2}, kb_per_point={config['kb_per_point']}", 
+            f"delta={config['delta']:.2}, num_tables={config['num_tables']}", 
             fontsize=16
         )
         plt.ylabel('Distance Computations (log scale)', fontsize=12)
@@ -100,7 +100,7 @@ def plot_distance_computations(data, output_folder):
         
         safe_filename = (
             f"distance_computations_{config['dataset']}_k{config['k']}_"
-            f"delta{config['delta']:.2}_kb{config['kb_per_point']}.png"
+            f"delta{config['delta']:.2}_kb{config['num_tables']}.png"
         )
         safe_filename = "".join(x for x in safe_filename if x.isalnum() or x in "._-").lower()
         

@@ -26,7 +26,7 @@ def is_valid_file(parser, arg):
     else:
         return arg
 
-def fetch_distance_computations(db_path, prefix, git_commit_hash=None, num_clusters=0.5, kb_per_point=1):
+def fetch_distance_computations(db_path, prefix, git_commit_hash=None, num_clusters=0.5, num_tables=1):
     """
     Fetches distance computation data for datasets whose names start with the given prefix.
     It unions the CLANN and Puffinn queries.
@@ -40,12 +40,12 @@ def fetch_distance_computations(db_path, prefix, git_commit_hash=None, num_clust
         cr.k, 
         cr.delta, 
         cr.num_clusters AS num_cluster_factor,
-        cr.kb_per_point,
+        cr.num_tables,
         crq.distance_computations AS value
     FROM clann_results cr
     JOIN clann_results_query crq ON (
         cr.num_clusters = crq.num_clusters AND 
-        cr.kb_per_point = crq.kb_per_point AND 
+        cr.num_tables = crq.num_tables AND 
         cr.k = crq.k AND 
         cr.delta = crq.delta AND 
         cr.dataset = crq.dataset AND 
@@ -53,7 +53,7 @@ def fetch_distance_computations(db_path, prefix, git_commit_hash=None, num_clust
     )
     WHERE cr.dataset LIKE '{prefix}%'
       AND cr.num_clusters BETWEEN {num_clusters} - 1e-6 AND {num_clusters} + 1e-6
-      AND cr.kb_per_point = {kb_per_point}
+      AND cr.num_tables = {num_tables}
     """
     if git_commit_hash:
         clann_query += f" AND cr.git_commit_hash = '{git_commit_hash}'"
@@ -65,11 +65,11 @@ def fetch_distance_computations(db_path, prefix, git_commit_hash=None, num_clust
         pr.k, 
         pr.delta, 
         NULL AS num_cluster_factor,
-        pr.kb_per_point,
+        pr.num_tables,
         prq.distance_computations AS value
     FROM puffinn_results pr
     JOIN puffinn_results_query prq ON (
-        pr.kb_per_point = prq.kb_per_point AND 
+        pr.num_tables = prq.num_tables AND 
         pr.k = prq.k AND 
         pr.delta = prq.delta AND 
         pr.dataset = prq.dataset
