@@ -234,10 +234,10 @@ class MetricsVisualizer:
                     label='Median',
                     color='red')
             
-            plt.title(f"Cluster Candidates Distribution (Sorted by Median)\n"
+            plt.title(f"Cluster Candidates Distribution\n"
                      f"Dataset: {config_row['dataset']}, "
                      f"K={config_row['k']}, δ={config_row['delta']:.2f}")
-            plt.xlabel("Cluster Index (Sorted)")
+            plt.xlabel("Cluster Index")
             plt.ylabel("Number of Candidates")
             plt.legend()
             plt.grid(True, alpha=0.3)

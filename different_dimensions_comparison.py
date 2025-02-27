@@ -122,7 +122,6 @@ def plot_distance_computations(data, output_folder, prefix):
     handles, labels = ax.get_legend_handles_labels()
     custom_line = Line2D([0], [0], color='black', marker='o', linestyle='-', linewidth=2, label='CLANN mean')
     handles.append(custom_line)
-    labels.append('CLANN mean')
     ax.legend(handles=handles, labels=labels)
     
     # Save the plot to the specified output folder
